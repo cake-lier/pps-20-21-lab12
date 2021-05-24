@@ -1,59 +1,57 @@
 package it.unibo.u12lab.code
 
-import java.io.FileInputStream
+import alice.tuprolog.Theory
+import it.unibo.u12lab.code.Scala2P._
+import alice.tuprolog.{Int => PrologInt}
 
-import alice._
-import alice.tuprolog.{Term, Theory}
-import Scala2P._
-
-/**
-  * Created by mirko on 4/10/17.
-  */
 class TicTacToeImpl(fileName: String) extends TicTacToe {
+  private val engine = mkPrologEngine(new Theory(ClassLoader.getSystemResourceAsStream(fileName)))
+  private val size = 3
 
-  private val engine = mkPrologEngine(new Theory(getClass.getResourceAsStream(fileName)))
-  private var tboard: Term = null
   createBoard()
 
-  override def createBoard() = {
+  override def createBoard(): Unit = {
     val goal = "retractall(board(_)),newboard(B),assert(board(B))"
-    solveWithSuccess(engine,goal)
+    solveWithSuccess(engine, goal)
   }
 
-  override def checkCompleted(): Boolean =
-    solveWithSuccess(engine,"board(B),boardfilled(B)")
+  override def checkCompleted(): Boolean = {
+    val goal = "board(B),boardfilled(B)"
+    solveWithSuccess(engine, goal)
+  }
 
+  override def checkVictory(): Boolean = {
+    val goal = "board(B),threeinarow(B)"
+    solveWithSuccess(engine, goal)
+  }
 
-  override def checkVictory(): Boolean =
-    solveWithSuccess(engine,"board(B),threeinarow(B)")
+  override def isAFreeCell(i: Int, j: Int): Boolean = {
+    val goal = s"board(B),not(filledsquare(B,${i * size + j + 1}))"
+    solveWithSuccess(engine, goal)
+  }
 
-
-  override def isAFreeCell(i: Int, j: Int): Boolean =
-    solveWithSuccess(engine,s"board(B),not(filledsquare(B,${i*3+j+1}))")
-
-  private def setCell(pos:Int, player: String): Unit = {
+  private def setCell(pos: Int, player: String): Unit = {
     val goal = s"retract(board(B)),!,setsquare(B,$pos,$player,B2),assert(board(B2))"
-    solveWithSuccess(engine,goal)
+    solveWithSuccess(engine, goal)
   }
 
   override def setHumanCell(i: Int, j: Int): Unit = {
-    setCell(i * 3 + j + 1,"'X'")
+    val humanCellSymbol = "'X'"
+    setCell(i * size + j + 1, humanCellSymbol)
   }
 
   override def setComputerCell(): Array[Int] = {
-    // a solution which just seeks for the first freecell
-    val pos = (for {
-      i <- 0 to 2
-      j <- 0 to 2
-      if (isAFreeCell(i, j))
-      k = i*3+j+1
-    } yield k).head
-    // change above, by calling predicate 'response'
-    setCell(pos,"'O'")
-    Array((pos-1)/3,(pos-1)%3)
+    val variable = "X"
+    val goal = s"board(B),response(B, 'O', $variable)"
+    val pos = solveOneAndGetTerm(engine, goal, variable).asInstanceOf[PrologInt].intValue()
+    val computerPlayerSymbol = "'O'"
+    setCell(pos, computerPlayerSymbol)
+    Array((pos - 1) / size, (pos - 1) % size)
   }
 
-  override def toString: String =
-    solveOneAndGetTerm(engine,"board(B)","B").toString
-
+  override def toString: String = {
+    val variable = "B"
+    val goal = s"board($variable)"
+    solveOneAndGetTerm(engine, goal, variable).toString
+  }
 }
